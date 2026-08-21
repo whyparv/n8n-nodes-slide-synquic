@@ -1,0 +1,62 @@
+{
+  "name": "n8n-nodes-slide-synquic",
+  "version": "0.1.1",
+  "description": "n8n community node for Slide \u2014 real-time triggers for WhatsApp, Instagram, SMS, voice, email, and Shopify events, plus multi-channel messaging actions.",
+  "keywords": [
+    "n8n-community-node-package",
+    "slide",
+    "whatsapp",
+    "sms",
+    "email",
+    "voice",
+    "instagram",
+    "shopify",
+    "crm"
+  ],
+  "license": "MIT",
+  "author": "Synquic",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc && node scripts/copy-icons.js",
+    "dev": "tsc --watch",
+    "lint": "eslint nodes credentials package.json --ext .ts,.json",
+    "test": "node --test test/*.test.js",
+    "lintfix": "eslint nodes credentials package.json --ext .ts,.json --fix",
+    "prepublishOnly": "npm run build && npm run lint && npm test"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "credentials": [
+      "dist/credentials/SlideApi.credentials.js"
+    ],
+    "nodes": [
+      "dist/nodes/Slide/Slide.node.js",
+      "dist/nodes/Slide/SlideTrigger.node.js"
+    ]
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "eslint": "^8.57.1",
+    "eslint-plugin-n8n-nodes-base": "^2.0.0",
+    "jsonc-eslint-parser": "^2.4.2",
+    "n8n-workflow": "^1.82.0",
+    "typescript": "^5.5.0"
+  },
+  "peerDependencies": {
+    "n8n-workflow": "*"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/whyparv/n8n-nodes-slide-synquic.git"
+  },
+  "homepage": "https://slide.synquic.com/developers",
+  "bugs": {
+    "url": "https://github.com/whyparv/n8n-nodes-slide-synquic/issues"
+  }
+}

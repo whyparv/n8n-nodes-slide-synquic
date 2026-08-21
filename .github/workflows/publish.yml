@@ -1,0 +1,80 @@
+# Publish this n8n community node to npm with a provenance statement.
+#
+# WHY CI RATHER THAN `npm publish` FROM A LAPTOP:
+# since 1 May 2026 n8n will not verify a community node unless it was published
+# from GitHub Actions with npm provenance. Provenance is a signed attestation,
+# issued by GitHub's OIDC infrastructure, tying the published tarball to a
+# specific repository, commit and workflow run, so anyone can verify that what
+# is on npm is what is in this repo. A local publish cannot produce one, and
+# `npx @n8n/scan-community-package` rejects the package without it.
+#
+# It also removes the 2FA/OTP dance: CI authenticates with a token, and the
+# attestation replaces the human second factor as the integrity guarantee.
+#
+# SETUP (once):
+#   1. This repository must be PUBLIC — provenance has to be publicly
+#      verifiable, and n8n checks the repo against the npm metadata.
+#   2. npmjs.com -> Access Tokens -> Granular Access Token with read+write on
+#      this package. Add it as the repository secret NPM_TOKEN.
+#
+# RELEASE:
+#   npm version patch          # bumps package.json and creates a git tag
+#   git push && git push --tags
+# ...or run this workflow manually from the Actions tab.
+
+name: Publish
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      # Required for provenance: lets the job mint the OIDC token npm uses to
+      # verify the build came from this repo. Without it, --provenance fails.
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # npm >= 9.5 is required for --provenance; Node 20 ships npm 10.
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      # n8n's own ruleset. A verified node must pass it, so a failure blocks the
+      # release here rather than surfacing in review feedback.
+      - name: Lint (eslint-plugin-n8n-nodes-base)
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Verify tag matches package version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "Tag $GITHUB_REF_NAME implies $TAG_VERSION but package.json is $PKG_VERSION"
+            exit 1
+          fi
+          echo "tag and package.json agree on $PKG_VERSION"
+
+      - name: Publish to npm with provenance
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
