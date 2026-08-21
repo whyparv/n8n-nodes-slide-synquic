@@ -1,25 +1,28 @@
-# Publish this n8n community node to npm with a provenance statement.
+# Publish this n8n community node to npm using TRUSTED PUBLISHING (OIDC).
 #
 # WHY CI RATHER THAN `npm publish` FROM A LAPTOP:
 # since 1 May 2026 n8n will not verify a community node unless it was published
-# from GitHub Actions with npm provenance. Provenance is a signed attestation,
-# issued by GitHub's OIDC infrastructure, tying the published tarball to a
-# specific repository, commit and workflow run, so anyone can verify that what
-# is on npm is what is in this repo. A local publish cannot produce one, and
+# from GitHub Actions with npm provenance — a signed attestation, issued by
+# GitHub's OIDC infrastructure, tying the tarball to a specific repository,
+# commit and workflow run. A local publish cannot produce one, and
 # `npx @n8n/scan-community-package` rejects the package without it.
 #
-# It also removes the 2FA/OTP dance: CI authenticates with a token, and the
-# attestation replaces the human second factor as the integrity guarantee.
+# WHY NO NPM_TOKEN SECRET:
+# trusted publishing authenticates with a short-lived OIDC token minted per run,
+# instead of a long-lived npm token stored as a repository secret. There is no
+# credential to leak, no 2FA/OTP prompt to satisfy, and npm generates the
+# provenance attestation automatically for a public package from a public repo.
 #
-# SETUP (once):
-#   1. This repository must be PUBLIC — provenance has to be publicly
-#      verifiable, and n8n checks the repo against the npm metadata.
-#   2. npmjs.com -> Access Tokens -> Granular Access Token with read+write on
-#      this package. Add it as the repository secret NPM_TOKEN.
+# SETUP (once, on npmjs.com — cannot be done from the CLI):
+#   Package page -> Settings -> Trusted Publisher -> GitHub Actions
+#     Organization or user : whyparv
+#     Repository           : n8n-nodes-slide-synquic
+#     Workflow filename    : publish.yml
+#   The repository must be PUBLIC and the package published publicly, otherwise
+#   npm will not attach provenance.
 #
 # RELEASE:
-#   npm version patch          # bumps package.json and creates a git tag
-#   git push && git push --tags
+#   npm version patch && git push && git push --tags
 # ...or run this workflow manually from the Actions tab.
 
 name: Publish
@@ -74,7 +77,9 @@ jobs:
           fi
           echo "tag and package.json agree on $PKG_VERSION"
 
+      # No NODE_AUTH_TOKEN: trusted publishing supplies short-lived OIDC
+      # credentials. --provenance is the default under trusted publishing but is
+      # stated explicitly so the intent is visible, and so the run fails loudly
+      # rather than silently publishing without an attestation.
       - name: Publish to npm with provenance
         run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
