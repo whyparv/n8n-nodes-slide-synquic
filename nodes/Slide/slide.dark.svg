@@ -13,9 +13,6 @@
     scale = (64 * 0.54) / 20 = 1.728 ; offset = (64 - 34.56) / 2 = 14.72
   -->
   <rect width="64" height="64" rx="16" fill="#d4e157"/>
-  <!-- Hairline edge: the lime tile needs definition against a white canvas;
-       on dark themes it already separates, so slide.dark.svg omits this. -->
-  <rect x="0.5" y="0.5" width="63" height="63" rx="15.5" fill="none" stroke="#0c0c0d" stroke-opacity="0.12"/>
   <g transform="translate(14.72 14.72) scale(1.728)">
     <rect x="2" y="4.5"  width="11" height="4" rx="2" fill="#0c0c0d"/>
     <rect x="7" y="11.5" width="11" height="4" rx="2" fill="#0c0c0d"/>

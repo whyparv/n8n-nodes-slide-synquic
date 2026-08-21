@@ -38,6 +38,15 @@ module.exports = {
       files: ['./nodes/**/*.ts'],
       plugins: ['eslint-plugin-n8n-nodes-base'],
       extends: ['plugin:n8n-nodes-base/nodes'],
+      rules: {
+        // These three contradict @n8n/community-nodes, the ruleset the OFFICIAL
+        // verification scanner runs. This older plugin wants the string literal
+        // ['main']; the scanner requires NodeConnectionTypes.Main and errors on
+        // the literal. The scanner is the authority for verification, so the
+        // typed constant wins and these are off.
+        'n8n-nodes-base/node-class-description-inputs-wrong-regular-node': 'off',
+        'n8n-nodes-base/node-class-description-outputs-wrong': 'off',
+      },
     },
   ],
 };

@@ -1,4 +1,5 @@
 import type {
+	Icon,
 	IAuthenticateGeneric,
 	ICredentialTestRequest,
 	ICredentialType,
@@ -9,6 +10,9 @@ export class SlideApi implements ICredentialType {
 	name = 'slideApi';
 
 	displayName = 'Slide API';
+
+	// Themed variants so the credential renders correctly on both n8n themes.
+	icon: Icon = { light: 'file:../nodes/Slide/slide.svg', dark: 'file:../nodes/Slide/slide.dark.svg' };
 
 	documentationUrl = 'https://slide.synquic.com/developers';
 

@@ -8,7 +8,7 @@ import type {
 	INodePropertyOptions,
 	IDataObject,
 } from 'n8n-workflow';
-import { NodeOperationError } from 'n8n-workflow';
+import { NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
 
 import {
 	slideApiRequest,
@@ -20,14 +20,14 @@ export class SlideTrigger implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Slide Trigger',
 		name: 'slideTrigger',
-		icon: 'file:slide.svg',
+		icon: { light: 'file:slide.svg', dark: 'file:slide.dark.svg' },
 		group: ['trigger'],
 		version: 1,
 		subtitle: '={{$parameter["events"].length + " event(s)"}}',
 		description: 'Starts a workflow when something happens in your Slide account',
 		defaults: { name: 'Slide Trigger' },
 		inputs: [],
-		outputs: ['main'],
+		outputs: [NodeConnectionTypes.Main],
 		credentials: [{ name: 'slideApi', required: true }],
 		webhooks: [
 			{
@@ -114,9 +114,16 @@ export class SlideTrigger implements INodeType {
 					const currentUrl = this.getNodeWebhookUrl('default');
 					if (endpoint?.url !== currentUrl) return false;
 					return endpoint?.isActive === true && endpoint?.status === 'ACTIVE';
-				} catch {
-					// 404 or any read failure: treat as absent so create() runs and
-					// the workflow ends up subscribed either way.
+				} catch (error) {
+					// Treat as absent so create() runs and the workflow ends up
+					// subscribed either way — but say so. Silently swallowing this
+					// hides a Slide outage or a revoked key behind what looks like
+					// a routine re-subscribe.
+					this.logger.warn(
+						`Slide Trigger: could not confirm webhook ${webhookId}, assuming it no longer exists. ${
+							(error as Error).message
+						}`,
+					);
 					return false;
 				}
 			},

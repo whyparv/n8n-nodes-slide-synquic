@@ -1,4 +1,5 @@
 import type {
+	JsonObject,
 	IExecuteFunctions,
 	ILoadOptionsFunctions,
 	INodeExecutionData,
@@ -7,7 +8,7 @@ import type {
 	INodePropertyOptions,
 	IDataObject,
 } from 'n8n-workflow';
-import { NodeOperationError } from 'n8n-workflow';
+import { NodeConnectionTypes, NodeApiError, NodeOperationError } from 'n8n-workflow';
 
 import { slideApiRequest, loadListOptions } from './GenericFunctions';
 
@@ -15,14 +16,17 @@ export class Slide implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Slide',
 		name: 'slide',
-		icon: 'file:slide.svg',
+		icon: { light: 'file:slide.svg', dark: 'file:slide.dark.svg' },
 		group: ['output'],
 		version: 1,
+		// Exposed to AI Agent nodes as a callable tool. Sending a message or
+		// looking up a contact are exactly the kind of actions an agent needs.
+		usableAsTool: true,
 		subtitle: '={{$parameter["operation"] + ": " + $parameter["resource"]}}',
 		description: 'Send messages and manage contacts in Slide',
 		defaults: { name: 'Slide' },
-		inputs: ['main'],
-		outputs: ['main'],
+		inputs: [NodeConnectionTypes.Main],
+		outputs: [NodeConnectionTypes.Main],
 		credentials: [{ name: 'slideApi', required: true }],
 		properties: [
 			{
@@ -584,7 +588,10 @@ export class Slide implements INodeType {
 					});
 					continue;
 				}
-				throw error;
+				// Wrapped rather than re-thrown raw: NodeApiError renders Slide's
+				// own message in the UI and pins the failure to this input item,
+				// instead of surfacing an unlabelled stack.
+				throw new NodeApiError(this.getNode(), error as JsonObject, { itemIndex: i });
 			}
 		}
 
