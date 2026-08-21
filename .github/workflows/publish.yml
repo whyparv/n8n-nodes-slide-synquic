@@ -52,8 +52,17 @@ jobs:
           node-version: 20
           registry-url: 'https://registry.npmjs.org'
 
+      # --ignore-scripts skips native addon builds. n8n-workflow pulls in
+      # isolated-vm, a C++ addon that fails to compile on Node 20 — which is
+      # what broke this workflow twice at the install step, before build, lint
+      # or test ever ran.
+      #
+      # Safe here because n8n-workflow is a devDependency used only for its
+      # TypeScript declarations at compile time; it is a peerDependency at
+      # runtime, supplied by the n8n instance that loads this node. Nothing in
+      # this package executes it, so nothing needs it compiled.
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Build
         run: npm run build
