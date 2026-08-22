@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-slide-synquic",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "n8n community node for Slide \u2014 real-time triggers for WhatsApp, Instagram, SMS, voice, email, and Shopify events, plus multi-channel messaging actions.",
   "keywords": [
     "n8n-community-node-package",
@@ -16,7 +16,7 @@
   "license": "MIT",
   "author": {
     "name": "Synquic",
-    "email": "support@synquic.com",
+    "email": "p@synquic.com",
     "url": "https://synquic.com"
   },
   "main": "index.js",
