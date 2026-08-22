@@ -60,7 +60,8 @@ export class Slide implements INodeType {
 						name: 'Send WhatsApp Template',
 						value: 'sendWhatsAppTemplate',
 						description: 'Send an approved WhatsApp template',
-						action: 'Send a whats app template',
+						// eslint-disable-next-line n8n-nodes-base/node-param-operation-option-action-miscased -- "WhatsApp" is a proper noun. The rule's sentence-case autofix rewrote this to "whats app template", which is what merchants then saw in the n8n UI.
+						action: 'Send a WhatsApp template',
 					},
 					{
 						name: 'Send Email',

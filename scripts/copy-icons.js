@@ -1,5 +1,5 @@
 /**
- * Validate and copy node icons into dist.
+ * Validate and copy node icons AND codex metadata into dist.
  *
  * tsc emits JavaScript only, but n8n resolves `icon: 'file:slide.svg'` relative
  * to the COMPILED node file. Without the copy step the package builds, loads,
@@ -44,7 +44,18 @@ const failures = [];
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const from = path.join(dir, entry.name);
     if (entry.isDirectory()) { walk(from); continue; }
-    if (!/\.(svg|png)$/.test(entry.name)) continue;
+    // Icons AND codex metadata both have to reach dist/.
+    if (!/\.(svg|png|node\.json)$/.test(entry.name)) continue;
+
+    if (entry.name.endsWith('.node.json')) {
+      // A malformed codex is silently ignored by n8n, so fail the build instead.
+      try {
+        JSON.parse(fs.readFileSync(from, 'utf8'));
+      } catch (err) {
+        failures.push(`${from}: invalid JSON — ${err.message}`);
+        continue;
+      }
+    }
 
     if (entry.name.endsWith('.svg')) {
       const problems = validateSvg(from, fs.readFileSync(from, 'utf8'));
@@ -59,8 +70,8 @@ const failures = [];
 })('nodes');
 
 if (failures.length) {
-  console.error('Invalid icon(s) — refusing to build:\n  ' + failures.join('\n  '));
+  console.error('Invalid asset(s) — refusing to build:\n  ' + failures.join('\n  '));
   process.exit(1);
 }
 
-console.log(`validated and copied ${copied} icon(s) into dist/`);
+console.log(`validated and copied ${copied} icon/codex file(s) into dist/`);

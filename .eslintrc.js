@@ -13,6 +13,14 @@ module.exports = {
   ignorePatterns: ['.eslintrc.js', '**/*.js', 'node_modules/**', 'dist/**'],
   overrides: [
     {
+      // Codex metadata (`*.node.json`) is JSON, not TypeScript. Without its own
+      // parser the TS project rule rejects it outright and the lint step fails,
+      // which would block `prepublishOnly`.
+      files: ['**/*.node.json'],
+      parser: 'jsonc-eslint-parser',
+      rules: {},
+    },
+    {
       files: ['package.json'],
       // package.json is JSON, not TypeScript — the TS parser cannot read it and
       // errors out unless it gets its own parser here.

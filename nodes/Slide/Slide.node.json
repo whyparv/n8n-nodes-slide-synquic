@@ -1,0 +1,22 @@
+{
+  "node": "n8n-nodes-slide-synquic.slide",
+  "nodeVersion": "1.0",
+  "codexVersion": "1.0",
+  "categories": ["Communication", "Marketing"],
+  "resources": {
+    "primaryDocumentation": [
+      {
+        "url": "https://slide.synquic.com/docs/platform/developers"
+      }
+    ],
+    "credentialDocumentation": [
+      {
+        "url": "https://slide.synquic.com/docs/platform/developers"
+      }
+    ]
+  },
+  "alias": ["WhatsApp", "SMS", "Email", "Message", "Contact", "Campaign"],
+  "subcategories": {
+    "Communication": ["Messaging"]
+  }
+}
