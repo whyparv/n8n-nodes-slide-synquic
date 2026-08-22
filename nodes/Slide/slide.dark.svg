@@ -1,17 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Slide">
-  <!--
-    Slide brand mark, taken from the app's own logo component
-    (frontend/components/layout/LandingNav.tsx and app/developers/page.tsx):
-    two offset bars on the brand lime, suggesting a slide.
-
-    Brand lime #d4e157 is the canonical value behind --accent across the app.
-    Bars are #0c0c0d, matching the components rather than pure black.
-
-    The mark is authored in the app's 20x20 coordinate space and placed here at
-    54% of the tile, the same ratio the React component uses (size * 0.54), so
-    the padding matches the logo everywhere else it appears.
-    scale = (64 * 0.54) / 20 = 1.728 ; offset = (64 - 34.56) / 2 = 14.72
-  -->
+  <title>Slide</title>
   <rect width="64" height="64" rx="16" fill="#d4e157"/>
   <g transform="translate(14.72 14.72) scale(1.728)">
     <rect x="2" y="4.5"  width="11" height="4" rx="2" fill="#0c0c0d"/>
