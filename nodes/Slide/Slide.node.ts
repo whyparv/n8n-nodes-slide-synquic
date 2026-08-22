@@ -226,6 +226,52 @@ export class Slide implements INodeType {
 				description:
 					'Comma-separated values for the numbered placeholders, in order: the first fills {{1}}, the second {{2}}, and so on. Leave a slot empty to send it blank, for example "Priya,,#1042".',
 			},
+			{
+				displayName: 'Button Variables',
+				name: 'buttonVariables',
+				type: 'fixedCollection',
+				typeOptions: { multipleValues: true },
+				default: {},
+				displayOptions: {
+					show: { resource: ['message'], operation: ['sendWhatsAppTemplate'] },
+				},
+				description:
+					'Required for templates whose buttons take a variable, such as a dynamic URL or a copy-code button. Without it WhatsApp rejects the send with error 131008. Quick-reply buttons are filled in automatically and do not need an entry here.',
+				options: [
+					{
+						name: 'button',
+						displayName: 'Button',
+						values: [
+							{
+								displayName: 'Index',
+								name: 'index',
+								type: 'number',
+								default: 0,
+								description:
+									'Position of the button in the approved template, counting from 0',
+							},
+							{
+								displayName: 'Type',
+								name: 'buttonType',
+								type: 'options',
+								default: 'url',
+								options: [
+									{ name: 'Copy Code', value: 'copy_code' },
+									{ name: 'URL', value: 'url' },
+								],
+							},
+							{
+								displayName: 'Value',
+								name: 'value',
+								type: 'string',
+								default: '',
+								description:
+									'For a URL button, the part that replaces the variable in the link. For a copy-code button, the code itself.',
+							},
+						],
+					},
+				],
+			},
 
 			// ── message: sendEmail ────────────────────────────────────────────
 			{
@@ -469,6 +515,8 @@ export class Slide implements INodeType {
 						languageCode: (this.getNodeParameter('languageCode', i) as string) || 'en',
 					};
 
+					const components: IDataObject[] = [];
+
 					const raw = (this.getNodeParameter('bodyVariables', i, '') as string);
 					if (raw.trim()) {
 						// Split WITHOUT dropping empties: these fill positional {{1}},
@@ -478,8 +526,34 @@ export class Slide implements INodeType {
 						const parameters = raw
 							.split(',')
 							.map((value) => ({ type: 'text', text: value.trim() }));
-						body.components = [{ type: 'body', parameters }];
+						components.push({ type: 'body', parameters });
 					}
+
+					// Buttons that carry a variable must be sent explicitly. Slide
+					// auto-fills quick-reply payloads, but a dynamic URL or copy-code
+					// button has no value it could infer, and WhatsApp rejects the whole
+					// send with error 131008 if one is missing.
+					const buttonRows =
+						((this.getNodeParameter('buttonVariables', i, {}) as IDataObject)
+							.button as IDataObject[]) ?? [];
+					for (const row of buttonRows) {
+						const buttonType = String(row.buttonType ?? 'url');
+						const value = String(row.value ?? '').trim();
+						if (!value) continue;
+						components.push({
+							type: 'button',
+							sub_type: buttonType,
+							// Meta requires index as a string, not a number.
+							index: String(row.index ?? 0),
+							parameters: [
+								buttonType === 'copy_code'
+									? { type: 'coupon_code', coupon_code: value }
+									: { type: 'text', text: value },
+							],
+						});
+					}
+
+					if (components.length) body.components = components;
 
 					responseData = await slideApiRequest.call(
 						this,

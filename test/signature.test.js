@@ -108,3 +108,95 @@ test('live parity with the backend signer (skipped outside the monorepo)', { ski
     'the backend signing scheme has changed — regenerate test/vectors.json',
   );
 });
+
+// ── WhatsApp template component building ────────────────────────────────────
+//
+// A template whose button carries a variable (dynamic URL, copy code) is
+// rejected by WhatsApp with error 131008 unless the button parameter is sent.
+// Slide auto-fills quick-reply payloads; these it cannot infer.
+
+const { Slide } = require('../dist/nodes/Slide/Slide.node.js');
+
+const runTemplateSend = async (params) => {
+  const captured = [];
+  const ctx = {
+    getInputData: () => [{ json: {} }],
+    getNodeParameter: (name, _i, fallback) =>
+      name in params ? params[name] : fallback,
+    getNode: () => ({ name: 'Slide' }),
+    continueOnFail: () => false,
+    getCredentials: async () => ({ apiKey: 'k', baseUrl: 'https://example.com' }),
+    helpers: {
+      httpRequestWithAuthentication: async (_c, options) => {
+        captured.push(options);
+        return { ok: true };
+      },
+    },
+  };
+  await Slide.prototype.execute.call(ctx);
+  return captured[0].body;
+};
+
+test('sends a URL button parameter so WhatsApp does not reject with 131008', async () => {
+  const body = await runTemplateSend({
+    resource: 'message',
+    operation: 'sendWhatsAppTemplate',
+    to: '+919926446622',
+    templateName: 'verification',
+    languageCode: 'en',
+    bodyVariables: '123456',
+    buttonVariables: { button: [{ index: 0, buttonType: 'url', value: '123456' }] },
+  });
+
+  const button = body.components.find((c) => c.type === 'button');
+  assert.ok(button, 'a button component must be sent');
+  assert.strictEqual(button.sub_type, 'url');
+  // Meta requires index as a string; a number is rejected.
+  assert.strictEqual(button.index, '0');
+  assert.deepStrictEqual(button.parameters, [{ type: 'text', text: '123456' }]);
+});
+
+test('copy-code buttons use the coupon_code parameter shape', async () => {
+  const body = await runTemplateSend({
+    resource: 'message',
+    operation: 'sendWhatsAppTemplate',
+    to: '+919926446622',
+    templateName: 'promo',
+    languageCode: 'en',
+    buttonVariables: { button: [{ index: 1, buttonType: 'copy_code', value: 'SAVE20' }] },
+  });
+  const button = body.components.find((c) => c.type === 'button');
+  assert.strictEqual(button.sub_type, 'copy_code');
+  assert.strictEqual(button.index, '1');
+  assert.deepStrictEqual(button.parameters, [{ type: 'coupon_code', coupon_code: 'SAVE20' }]);
+});
+
+test('body and button components are sent together, body first', async () => {
+  const body = await runTemplateSend({
+    resource: 'message',
+    operation: 'sendWhatsAppTemplate',
+    to: '+919926446622',
+    templateName: 'verification',
+    languageCode: 'en',
+    bodyVariables: 'Priya,,#1042',
+    buttonVariables: { button: [{ index: 0, buttonType: 'url', value: 'abc' }] },
+  });
+  assert.strictEqual(body.components[0].type, 'body');
+  assert.strictEqual(body.components[1].type, 'button');
+  // Blank middle variable keeps its slot — see the positional test above.
+  assert.deepStrictEqual(
+    body.components[0].parameters.map((p) => p.text),
+    ['Priya', '', '#1042'],
+  );
+});
+
+test('a template with no variables sends no components at all', async () => {
+  const body = await runTemplateSend({
+    resource: 'message',
+    operation: 'sendWhatsAppTemplate',
+    to: '+919926446622',
+    templateName: 'hello',
+    languageCode: 'en',
+  });
+  assert.strictEqual(body.components, undefined);
+});
