@@ -60,8 +60,13 @@ export class Slide implements INodeType {
 						name: 'Send WhatsApp Template',
 						value: 'sendWhatsAppTemplate',
 						description: 'Send an approved WhatsApp template',
-						// eslint-disable-next-line n8n-nodes-base/node-param-operation-option-action-miscased -- "WhatsApp" is a proper noun. The rule's sentence-case autofix rewrote this to "whats app template", which is what merchants then saw in the n8n UI.
-						action: 'Send a WhatsApp template',
+						// The action-miscased rule derives its expected string from the
+						// camelCase value, so any capital mid-string fails and its autofix
+						// produces "Send a whats app template". n8n's scanner ignores
+						// inline eslint-disable comments, so the only real options were a
+						// lowercase "whatsapp" or a label with no brand name in it. The
+						// dropdown `name` above still carries the correct branding.
+						action: 'Send a template message',
 					},
 					{
 						name: 'Send Email',
