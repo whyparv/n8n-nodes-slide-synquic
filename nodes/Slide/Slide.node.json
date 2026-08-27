@@ -2,7 +2,10 @@
   "node": "n8n-nodes-slide-synquic.slide",
   "nodeVersion": "1.0",
   "codexVersion": "1.0",
-  "categories": ["Communication", "Marketing"],
+  "categories": [
+    "Communication",
+    "Marketing & Content"
+  ],
   "resources": {
     "primaryDocumentation": [
       {
@@ -15,8 +18,12 @@
       }
     ]
   },
-  "alias": ["WhatsApp", "SMS", "Email", "Message", "Contact", "Campaign"],
-  "subcategories": {
-    "Communication": ["Messaging"]
-  }
+  "alias": [
+    "WhatsApp",
+    "SMS",
+    "Email",
+    "Message",
+    "Contact",
+    "Campaign"
+  ]
 }

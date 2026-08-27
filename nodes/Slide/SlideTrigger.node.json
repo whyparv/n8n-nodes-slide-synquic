@@ -2,7 +2,10 @@
   "node": "n8n-nodes-slide-synquic.slideTrigger",
   "nodeVersion": "1.0",
   "codexVersion": "1.0",
-  "categories": ["Communication", "Marketing"],
+  "categories": [
+    "Communication",
+    "Marketing & Content"
+  ],
   "resources": {
     "primaryDocumentation": [
       {
@@ -15,8 +18,10 @@
       }
     ]
   },
-  "alias": ["Slide", "Trigger", "Webhook", "Event"],
-  "subcategories": {
-    "Communication": ["Messaging"]
-  }
+  "alias": [
+    "Slide",
+    "Trigger",
+    "Webhook",
+    "Event"
+  ]
 }

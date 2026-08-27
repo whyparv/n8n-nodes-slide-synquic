@@ -37,6 +37,49 @@ function validateSvg(file, xml) {
   return problems;
 }
 
+/**
+ * Codex metadata rules.
+ *
+ * n8n's manual review rejected a submission for two things nothing automated
+ * caught: an unsupported `subcategories` key, and the category "Marketing",
+ * which is not valid and is silently dropped by the UI. Both are cheap to check
+ * and expensive to discover — a rejection costs a review round trip.
+ *
+ * Field list and categories per
+ * https://docs.n8n.io/integrations/creating-nodes/build/reference/node-codex-files/
+ */
+const CODEX_FIELDS = ['node', 'nodeVersion', 'codexVersion', 'categories', 'resources', 'alias'];
+const CODEX_CATEGORIES = [
+  'Analytics', 'Communication', 'Data & Storage', 'Development', 'Finance & Accounting',
+  'Marketing & Content', 'Miscellaneous', 'Productivity', 'Sales', 'Utility', 'HITL',
+  'AI', 'Core Nodes',
+];
+
+function validateCodex(file, raw) {
+  const problems = [];
+  let codex;
+
+  try {
+    codex = JSON.parse(raw);
+  } catch (err) {
+    return [`invalid JSON — ${err.message}`];
+  }
+
+  for (const key of Object.keys(codex)) {
+    if (!CODEX_FIELDS.includes(key)) {
+      problems.push(`unsupported field "${key}" (allowed: ${CODEX_FIELDS.join(', ')})`);
+    }
+  }
+
+  for (const category of codex.categories || []) {
+    if (!CODEX_CATEGORIES.includes(category)) {
+      problems.push(`category "${category}" is not a recognised n8n category and will be silently dropped`);
+    }
+  }
+
+  return problems;
+}
+
 let copied = 0;
 const failures = [];
 
@@ -48,13 +91,8 @@ const failures = [];
     if (!/\.(svg|png|node\.json)$/.test(entry.name)) continue;
 
     if (entry.name.endsWith('.node.json')) {
-      // A malformed codex is silently ignored by n8n, so fail the build instead.
-      try {
-        JSON.parse(fs.readFileSync(from, 'utf8'));
-      } catch (err) {
-        failures.push(`${from}: invalid JSON — ${err.message}`);
-        continue;
-      }
+      const problems = validateCodex(from, fs.readFileSync(from, 'utf8'));
+      if (problems.length) { failures.push(`${from}: ${problems.join('; ')}`); continue; }
     }
 
     if (entry.name.endsWith('.svg')) {
