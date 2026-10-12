@@ -25,7 +25,7 @@ export class SlideApi implements ICredentialType {
 			default: '',
 			required: true,
 			description:
-				'Create a key in your Slide dashboard under Admin, API Keys. Trigger nodes need the webhooks:read and webhooks:write scopes. Add send scopes (whatsapp:send, email:send, sms:send) for the actions you plan to use.',
+				'Create a key in your Slide dashboard under Admin, API Keys. Trigger nodes need the webhooks:read and webhooks:write scopes. Add send scopes (whatsapp:send, email:send, sms:send) for the actions you plan to use. To create or update contacts, create a new API key with contacts:write (and contacts:read for Search): a key that only has the email list permission cannot create contacts, and the permissions of a key cannot be edited.',
 		},
 		{
 			displayName: 'Base URL',

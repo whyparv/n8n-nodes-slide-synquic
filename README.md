@@ -33,8 +33,10 @@ npm install n8n-nodes-slide-synquic
 | Message | **Send WhatsApp Template** | Sends an approved WhatsApp template, with positional body variables and URL or copy-code button variables. |
 | Message | **Send Email** | Sends a transactional email from one of your templates, with template variables, subject override and reply-to. |
 | Message | **Send SMS** | Sends an SMS from a registered sender id, with optional DLT template id and transactional or promotional route. |
-| Contact | **Search** | Finds contacts by email, phone, or name, with a result limit. |
-| Contact | **Create or Update** | Upserts a contact by email, with first and last name, phone, company and tags. |
+| Contact | **Search** | Finds contacts in your contact list, with a result limit. **Search By** picks how: any field (name, phone or email contains the text), or an exact email or phone to find one person. |
+| Contact | **Create or Update** | Creates a contact in your contact list, or updates the one that matches. Enter an email, a phone number, or both: a contact is matched by phone first, then by email. Also takes first and last name, company and tags. |
+
+**Contacts are your contact list.** Search and Create or Update both work on the Contacts page of your Slide dashboard, so a contact the node creates is one the node can find. Create or Update returns the contact with `created` (`true` for a new contact, `false` for an update). Tags are added and never removed, a blank field never clears a value, and nothing here changes an unsubscribe. A new contact counts toward your plan's contact limit. When two workflow runs write the same person at the same moment, Slide can ask for one of them to be sent again: the node does that once by itself, and never repeats a message send.
 
 Template pickers (email templates, WhatsApp templates) and the SMS sender picker are loaded live from your account, so you select a real template rather than typing an id and discovering the typo at run time. Each also accepts an expression if you need a dynamic value.
 
@@ -70,7 +72,9 @@ Required scopes:
 | Send Email | `email:send` |
 | Send SMS | `sms:send` |
 | Contact search | `contacts:read` |
-| Contact create or update | `email:contacts:write` |
+| Contact create or update | `contacts:write` |
+
+The permissions of an API key cannot be edited. If your key was created before `contacts:write` existed (for example a key that only has the email list permission), Create or Update is refused until you create a new key that has `contacts:write` and put it in the credential. The node says so in plain words when that happens.
 
 ## How it works
 
@@ -91,7 +95,7 @@ Required scopes:
 | `nodes/Slide/slide.svg`, `slide.dark.svg` | Node icons, light and dark variants. |
 | `credentials/SlideApi.credentials.ts` | The Slide API credential, its auth injection and its test request. |
 | `scripts/copy-icons.js` | Validates and copies icons and codex metadata into `dist/`. |
-| `test/` | Signature verification tests and their vectors. |
+| `test/` | Signature verification tests and their vectors, and the contact operation tests. |
 | `.github/workflows/publish.yml` | The npm release workflow. |
 
 ## Development

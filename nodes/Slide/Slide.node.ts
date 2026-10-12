@@ -8,9 +8,22 @@ import type {
 	INodePropertyOptions,
 	IDataObject,
 } from 'n8n-workflow';
-import { NodeConnectionTypes, NodeApiError, NodeOperationError } from 'n8n-workflow';
+import { NodeConnectionTypes, NodeApiError, NodeOperationError, sleep } from 'n8n-workflow';
 
-import { slideApiRequest, loadListOptions } from './GenericFunctions';
+import {
+	slideApiRequest,
+	loadListOptions,
+	isMissingScopeError,
+	contactRetryDelaySeconds,
+} from './GenericFunctions';
+
+/** The contact list: Search reads it, Create or Update writes one contact to it. */
+const CONTACTS_PATH = '/v1/contacts';
+
+const CONTACT_WRITE_SCOPE_MESSAGE =
+	'This API key cannot create or update contacts: it needs the permission contacts:write';
+const CONTACT_WRITE_SCOPE_FIX =
+	'The permissions of an API key cannot be edited. Create a new key that has contacts:write in your Slide dashboard under Admin, API Keys, then put it in this credential.';
 
 export class Slide implements INodeType {
 	description: INodeTypeDescription = {
@@ -405,6 +418,34 @@ export class Slide implements INodeType {
 
 			// ── contact: search ───────────────────────────────────────────────
 			{
+				displayName: 'Search By',
+				name: 'searchBy',
+				type: 'options',
+				// 'any' is what this operation always did, so a workflow saved before
+				// this field existed keeps sending the same request.
+				default: 'any',
+				displayOptions: { show: { resource: ['contact'], operation: ['search'] } },
+				options: [
+					{
+						name: 'Any Field (Contains)',
+						value: 'any',
+						description: 'Contacts whose name, phone or email contains the text',
+					},
+					{
+						name: 'Email (Exact)',
+						value: 'email',
+						description: 'The contact with exactly this email address',
+					},
+					{
+						name: 'Phone (Exact)',
+						value: 'phone',
+						description: 'The contact with exactly this phone number, with or without spaces',
+					},
+				],
+				description:
+					'To find one person, search by their exact email or phone. Any Field also returns partial matches.',
+			},
+			{
 				displayName: 'Search',
 				name: 'search',
 				type: 'string',
@@ -424,14 +465,27 @@ export class Slide implements INodeType {
 			},
 
 			// ── contact: upsert ───────────────────────────────────────────────
+			// Email OR Phone is required, so neither field can carry `required`.
+			// The rule is checked when the node runs.
 			{
 				displayName: 'Email',
 				name: 'email',
 				type: 'string',
 				placeholder: 'name@email.com',
-				required: true,
 				default: '',
 				displayOptions: { show: { resource: ['contact'], operation: ['upsert'] } },
+				description:
+					'Enter an email, a phone number, or both. A contact is matched by phone first, then by email.',
+			},
+			{
+				displayName: 'Phone',
+				name: 'phone',
+				type: 'string',
+				placeholder: '+919876543210',
+				default: '',
+				displayOptions: { show: { resource: ['contact'], operation: ['upsert'] } },
+				description:
+					'Enter a phone number, an email, or both. Include the country code, for example +919876543210.',
 			},
 			{
 				displayName: 'Additional Fields',
@@ -441,10 +495,25 @@ export class Slide implements INodeType {
 				default: {},
 				displayOptions: { show: { resource: ['contact'], operation: ['upsert'] } },
 				options: [
-					{ displayName: 'Company', name: 'company', type: 'string', default: '' },
+					{
+						displayName: 'Company',
+						name: 'company',
+						type: 'string',
+						default: '',
+						description: 'Kept with the email address, so it needs an Email',
+					},
 					{ displayName: 'First Name', name: 'firstName', type: 'string', default: '' },
 					{ displayName: 'Last Name', name: 'lastName', type: 'string', default: '' },
-					{ displayName: 'Phone', name: 'phone', type: 'string', default: '' },
+					{
+						// Where the phone was entered before the Phone field above
+						// existed. Still read, so a saved workflow keeps working.
+						displayName: 'Phone (Legacy)',
+						name: 'phone',
+						type: 'string',
+						default: '',
+						description:
+							'Use the Phone field above for new workflows. When both are filled, the Phone field above is used.',
+					},
 					{
 						displayName: 'Tags',
 						name: 'tags',
@@ -606,13 +675,19 @@ export class Slide implements INodeType {
 				}
 
 				else if (resource === 'contact' && operation === 'search') {
+					// 'email' and 'phone' are the exact filters of the contact list.
+					// Anything else, including a workflow saved without this field,
+					// is the free-text search.
+					const searchBy = this.getNodeParameter('searchBy', i, 'any') as string;
+					const filter = searchBy === 'email' || searchBy === 'phone' ? searchBy : 'search';
+
 					const response = await slideApiRequest.call(
 						this,
 						'GET',
-						'/v1/contacts',
+						CONTACTS_PATH,
 						{},
 						{
-							search: (this.getNodeParameter('search', i) as string).trim(),
+							[filter]: (this.getNodeParameter('search', i) as string).trim(),
 							limit: this.getNodeParameter('limit', i, 10) as number,
 							page: 1,
 						},
@@ -622,10 +697,29 @@ export class Slide implements INodeType {
 
 				else if (resource === 'contact' && operation === 'upsert') {
 					const extra = this.getNodeParameter('contactFields', i, {}) as IDataObject;
-					const body: IDataObject = {
-						email: (this.getNodeParameter('email', i) as string).trim(),
-					};
-					for (const field of ['firstName', 'lastName', 'phone', 'company']) {
+					const email = String(this.getNodeParameter('email', i, '') ?? '').trim();
+					// The Phone field, or the one a workflow saved under Additional
+					// Fields before the Phone field existed.
+					const phone = String(
+						this.getNodeParameter('phone', i, '') || extra.phone || '',
+					).trim();
+
+					if (!email && !phone) {
+						throw new NodeOperationError(
+							this.getNode(),
+							'Enter an email address or a phone number',
+							{
+								description:
+									'A contact is matched by phone first, then by email, so at least one of the two is needed.',
+								itemIndex: i,
+							},
+						);
+					}
+
+					const body: IDataObject = {};
+					if (email) body.email = email;
+					if (phone) body.phone = phone;
+					for (const field of ['firstName', 'lastName', 'company']) {
 						if (extra[field]) body[field] = extra[field];
 					}
 					if (extra.tags) {
@@ -638,12 +732,33 @@ export class Slide implements INodeType {
 						if (tags.length) body.tags = tags;
 					}
 
-					responseData = await slideApiRequest.call(
-						this,
-						'POST',
-						'/v1/email/contacts',
-						body,
-					);
+					const write = () => slideApiRequest.call(this, 'POST', CONTACTS_PATH, body);
+					try {
+						try {
+							responseData = await write();
+						} catch (error) {
+							// Two requests about the same person arrived together and
+							// Slide asked for this one to be sent again. Nothing was
+							// written, and the contact is matched by phone or email, so
+							// one more try cannot make a second contact. Once, never more.
+							const retryInSeconds = contactRetryDelaySeconds(error);
+							if (retryInSeconds === null) throw error;
+							if (retryInSeconds > 0) await sleep(retryInSeconds * 1000);
+							responseData = await write();
+						}
+					} catch (error) {
+						// n8n words every 403 as "Forbidden - perhaps check your
+						// credentials?". Here the cause and the fix are both known, so
+						// say them: the key has no contacts:write, and a key's
+						// permissions cannot be edited.
+						if (isMissingScopeError(error)) {
+							throw new NodeOperationError(this.getNode(), CONTACT_WRITE_SCOPE_MESSAGE, {
+								description: CONTACT_WRITE_SCOPE_FIX,
+								itemIndex: i,
+							});
+						}
+						throw error;
+					}
 				}
 
 				else {

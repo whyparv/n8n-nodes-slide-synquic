@@ -82,6 +82,59 @@ export async function getWebhookEvents(
 	}));
 }
 
+/**
+ * True when Slide refused a call because the API key lacks a permission.
+ *
+ * A 403 has other causes too (the key's IP allow list, a plan without API
+ * access), and Slide names the cause in its message. Only the missing
+ * permission is matched here, so the caller can say which permission and how
+ * to get it without mislabelling the other cases.
+ */
+export function isMissingScopeError(error: unknown): boolean {
+	const failure = (error ?? {}) as {
+		httpCode?: string | number | null;
+		message?: string;
+		description?: string | null;
+		messages?: string[];
+	};
+	if (String(failure.httpCode ?? '') !== '403') return false;
+
+	const said = [failure.message, failure.description, ...(failure.messages ?? [])]
+		.filter((part): part is string => typeof part === 'string')
+		.join(' ');
+	return /scope/i.test(said);
+}
+
+/** The longest the node waits before sending a contact write again. */
+const CONTACT_RETRY_MAX_SECONDS = 5;
+
+/**
+ * How long to wait before sending a refused contact write once more, in
+ * seconds, or null when it must not be sent again.
+ *
+ * Two answers say "send it again", both a 409 for two requests about the same
+ * person that arrived together, and neither wrote anything:
+ *   CONTACT_UPSERT_IN_PROGRESS  wait the seconds Slide names, then send again
+ *   PHONE_IN_USE                send again once
+ * Every other refusal is final. A send is never repeated on a guess: without
+ * one of these two codes the answer is null.
+ */
+export function contactRetryDelaySeconds(error: unknown): number | null {
+	const failure = (error ?? {}) as {
+		httpCode?: string | number | null;
+		context?: { data?: IDataObject };
+	};
+	if (String(failure.httpCode ?? '') !== '409') return null;
+
+	const answered = failure.context?.data ?? {};
+	if (answered.code === 'PHONE_IN_USE') return 0;
+	if (answered.code === 'CONTACT_UPSERT_IN_PROGRESS') {
+		const asked = Number(answered.retryAfter);
+		return Number.isFinite(asked) && asked > 0 ? Math.min(asked, CONTACT_RETRY_MAX_SECONDS) : 1;
+	}
+	return null;
+}
+
 /** Options loader shared by the action node's template and sender pickers. */
 export async function loadListOptions(
 	this: ILoadOptionsFunctions,
