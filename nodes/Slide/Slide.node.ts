@@ -16,6 +16,14 @@ import {
 	isMissingScopeError,
 	contactRetryDelaySeconds,
 } from './GenericFunctions';
+import { taskProperties } from './TaskDescription';
+import {
+	executeTaskOperation,
+	loadTaskAssignees,
+	loadTaskAssigneesWithUnassigned,
+	loadTaskBoards,
+	loadTaskStatuses,
+} from './TaskFunctions';
 
 /** The contact list: Search reads it, Create or Update writes one contact to it. */
 const CONTACTS_PATH = '/v1/contacts';
@@ -36,7 +44,7 @@ export class Slide implements INodeType {
 		// looking up a contact are exactly the kind of actions an agent needs.
 		usableAsTool: true,
 		subtitle: '={{$parameter["operation"] + ": " + $parameter["resource"]}}',
-		description: 'Send messages and manage contacts in Slide',
+		description: 'Send messages and manage contacts and tasks in Slide',
 		defaults: { name: 'Slide' },
 		inputs: [NodeConnectionTypes.Main],
 		outputs: [NodeConnectionTypes.Main],
@@ -51,6 +59,8 @@ export class Slide implements INodeType {
 				options: [
 					{ name: 'Message', value: 'message' },
 					{ name: 'Contact', value: 'contact' },
+					{ name: 'Task', value: 'task' },
+					{ name: 'Task Board', value: 'taskBoard' },
 				],
 			},
 
@@ -523,6 +533,9 @@ export class Slide implements INodeType {
 					},
 				],
 			},
+
+			// ── task and taskBoard: TaskDescription.ts ────────────────────────
+			...taskProperties,
 		],
 	};
 
@@ -545,6 +558,10 @@ export class Slide implements INodeType {
 			async getSmsSenders(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
 				return loadListOptions.call(this, '/v1/sms/senders', 'senderId', 'senderId');
 			},
+			getTaskBoards: loadTaskBoards,
+			getTaskStatuses: loadTaskStatuses,
+			getTaskAssignees: loadTaskAssignees,
+			getTaskAssigneesWithUnassigned: loadTaskAssigneesWithUnassigned,
 		},
 	};
 
@@ -759,6 +776,10 @@ export class Slide implements INodeType {
 						}
 						throw error;
 					}
+				}
+
+				else if (resource === 'task' || resource === 'taskBoard') {
+					responseData = await executeTaskOperation.call(this, resource, operation, i);
 				}
 
 				else {

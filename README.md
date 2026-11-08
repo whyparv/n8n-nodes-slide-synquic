@@ -1,6 +1,6 @@
 # n8n-nodes-slide-synquic
 
-An [n8n](https://n8n.io) community node package for **Slide by Synquic**. It gives n8n two nodes: a **Slide Trigger** that starts a workflow in real time when something happens in your Slide account (a contact is created, a WhatsApp or Instagram message arrives, an email is opened, a voice call completes, a Shopify order is placed), and a **Slide** action node that sends messages across WhatsApp, SMS, RCS, Email, and Instagram and reads or upserts contacts. Triggers are webhook-based, not polled: activating a workflow subscribes an endpoint, deactivating it removes the subscription.
+An [n8n](https://n8n.io) community node package for **Slide by Synquic**. It gives n8n two nodes: a **Slide Trigger** that starts a workflow in real time when something happens in your Slide account (a contact is created, a WhatsApp or Instagram message arrives, an email is opened, a voice call completes, a task is created or completed, a Shopify order is placed), and a **Slide** action node that sends messages across WhatsApp, SMS, RCS, Email, and Instagram reads or upserts contacts, and creates, updates, completes and comments on CRM tasks. Triggers are webhook-based, not polled: activating a workflow subscribes an endpoint, deactivating it removes the subscription.
 
 [Installation](#installation) · [Credentials](#credentials) · [Nodes](#nodes) · [How it works](#how-it-works) · [Compatibility](#compatibility)
 
@@ -23,7 +23,7 @@ npm install n8n-nodes-slide-synquic
 | Node | Type | Credential | What it does |
 |---|---|---|---|
 | **Slide Trigger** (`slideTrigger`) | Trigger (webhook, `POST`) | Slide API (`slideApi`) | Starts a workflow on one or more Slide account events. |
-| **Slide** (`slide`) | Action | Slide API (`slideApi`) | Sends messages and manages contacts. |
+| **Slide** (`slide`) | Action | Slide API (`slideApi`) | Sends messages and manages contacts, tasks and task boards. |
 
 ### Slide, resources and operations
 
@@ -35,14 +35,27 @@ npm install n8n-nodes-slide-synquic
 | Message | **Send SMS** | Sends an SMS from a registered sender id, with optional DLT template id and transactional or promotional route. |
 | Contact | **Search** | Finds contacts in your contact list, with a result limit. **Search By** picks how: any field (name, phone or email contains the text), or an exact email or phone to find one person. |
 | Contact | **Create or Update** | Creates a contact in your contact list, or updates the one that matches. Enter an email, a phone number, or both: a contact is matched by phone first, then by email. Also takes first and last name, company and tags. |
+| Task | **Create** | Creates a task, or a subtask. Title, then optional description, board, stage, priority, assignee, linked contact, start and due date, labels. Without a board it goes on your default board, in the board's default stage. |
+| Task | **Get** | Gets one task with its subtasks and files. |
+| Task | **Get Many** | Gets tasks, with **Return All** or a **Limit**. Filters: board, stage, stage type (To Do, In Progress, Done, Cancelled), assignee (or Unassigned), priority, labels, linked contact, due after and before, overdue only, search text, include subtasks, and the sort. |
+| Task | **Update** | Changes the fields you set. A blank field is never sent, so it never clears a value; list a field under **Clear Fields** to empty it (assignee, contact, description, start date, due date, labels). Choosing another board moves the task and its subtasks. |
+| Task | **Complete** | Marks a task done (the board's first done stage), or with **Done** off reopens it (the board's default open stage). |
+| Task | **Delete** | Deletes a task with its subtasks, comments and files. Returns how many tasks were deleted. |
+| Task | **Add Comment** | Adds a comment to a task. In the task's history it shows as written via the API. |
+| Task | **Get Comments** | Gets a task's comments, oldest first, with **Return All** or a **Limit**. |
+| Task Board | **Get Many** | Gets every board with its stages and open task count. |
+| Task Board | **Get** | Gets one board with its stages and members. |
+| Task Board | **Create** | Creates a board from a template (General, Marketing, Software), with an optional description, colour, visibility (Workspace or Private) and members. A name already used by another board is refused. |
 
 **Contacts are your contact list.** Search and Create or Update both work on the Contacts page of your Slide dashboard, so a contact the node creates is one the node can find. Create or Update returns the contact with `created` (`true` for a new contact, `false` for an update). Tags are added and never removed, a blank field never clears a value, and nothing here changes an unsubscribe. A new contact counts toward your plan's contact limit. When two workflow runs write the same person at the same moment, Slide can ask for one of them to be sent again: the node does that once by itself, and never repeats a message send.
+
+**Tasks are your CRM tasks.** The Task and Task Board operations work on the boards of your Slide dashboard, and a task the node creates appears there. An API key acts for the whole workspace, so it sees and changes every board, private ones included. Changes made through the node show in a task's history as made via the API. Board, stage and assignee are picked from lists loaded live from your account (a stage belongs to one board, so choose the board first to see only its stages), and each also accepts an expression. Dates are ISO 8601: a date without a time (`2026-11-20`) is midnight UTC, so send a full timestamp with its time zone for a precise time. A task or a comment is never sent twice by the node itself, so a failed Create is safe to look at before you run it again.
 
 Template pickers (email templates, WhatsApp templates) and the SMS sender picker are loaded live from your account, so you select a real template rather than typing an id and discovering the typo at run time. Each also accepts an expression if you need a dynamic value.
 
 ### Slide Trigger, events and options
 
-The event list is fetched live from your account when you open the node, so events added to Slide later appear without you updating the package. One trigger node can listen to several events at once. Available events include contact created, contact updated, contact lifecycle stage changed, form submitted, inbound WhatsApp, Instagram and SMS messages, WhatsApp message status, completed voice calls, email delivered, opened, clicked, bounced and complained, and Shopify order created and fulfilled.
+The event list is fetched live from your account when you open the node, so events added to Slide later appear without you updating the package. One trigger node can listen to several events at once. Available events include contact created, contact updated, contact lifecycle stage changed, form submitted, inbound WhatsApp, Instagram and SMS messages, WhatsApp message status, completed voice calls, email delivered, opened, clicked, bounced and complained, and task created, updated, completed and deleted, task comments, and Shopify order created and fulfilled.
 
 | Option | Default | Effect |
 |---|---|---|
@@ -73,8 +86,11 @@ Required scopes:
 | Send SMS | `sms:send` |
 | Contact search | `contacts:read` |
 | Contact create or update | `contacts:write` |
+| Task and Task Board **Get**, **Get Many**, **Get Comments** | `tasks:read` |
+| Task **Create**, **Update**, **Complete**, **Add Comment**, Task Board **Create** | `tasks:write` |
+| Task **Delete** | `tasks:delete` |
 
-The permissions of an API key cannot be edited. If your key was created before `contacts:write` existed (for example a key that only has the email list permission), Create or Update is refused until you create a new key that has `contacts:write` and put it in the credential. The node says so in plain words when that happens.
+The permissions of an API key cannot be edited. If your key was created before `contacts:write` existed (for example a key that only has the email list permission), Create or Update is refused until you create a new key that has `contacts:write` and put it in the credential. The same goes for the task permissions. The node says so in plain words, naming the permission, when that happens.
 
 ## How it works
 
@@ -89,13 +105,15 @@ The permissions of an API key cannot be edited. If your key was created before `
 | Path | What lives there |
 |---|---|
 | `nodes/Slide/Slide.node.ts` | The action node: properties, option loaders, and `execute`. |
+| `nodes/Slide/TaskDescription.ts` | The Task and Task Board operations and fields. |
+| `nodes/Slide/TaskFunctions.ts` | The requests the Task and Task Board operations send, and their board, stage and assignee pickers. |
 | `nodes/Slide/SlideTrigger.node.ts` | The trigger node: webhook lifecycle and the delivery handler. |
 | `nodes/Slide/GenericFunctions.ts` | Shared API request helper, option loaders, and signature verification. |
 | `nodes/Slide/*.node.json` | Codex metadata (categories, aliases, documentation links). |
 | `nodes/Slide/slide.svg`, `slide.dark.svg` | Node icons, light and dark variants. |
 | `credentials/SlideApi.credentials.ts` | The Slide API credential, its auth injection and its test request. |
 | `scripts/copy-icons.js` | Validates and copies icons and codex metadata into `dist/`. |
-| `test/` | Signature verification tests and their vectors, and the contact operation tests. |
+| `test/` | Signature verification tests and their vectors, and the contact and task operation tests. |
 | `.github/workflows/publish.yml` | The npm release workflow. |
 
 ## Development
