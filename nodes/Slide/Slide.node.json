@@ -24,6 +24,8 @@
     "Email",
     "Message",
     "Contact",
-    "Campaign"
+    "Campaign",
+    "Task",
+    "Todo"
   ]
 }
